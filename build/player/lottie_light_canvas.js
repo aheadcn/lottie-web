@@ -10,8 +10,8 @@
         root.bodymovin = root.lottie;
     }
 }((window || {}), function(window) {
-    "use strict";
-    var svgNS = "http://www.w3.org/2000/svg";
+	"use strict";
+var svgNS = "http://www.w3.org/2000/svg";
 
 var locationHref = '';
 
@@ -628,7 +628,7 @@ var Matrix = (function(){
         return x * this.props[2] + y * this.props[6] + z * this.props[10] + this.props[14];
     }
 
-    function inversePoint(pt) {
+    function getInverseMatrix() {
         var determinant = this.props[0] * this.props[5] - this.props[1] * this.props[4];
         var a = this.props[5]/determinant;
         var b = - this.props[1]/determinant;
@@ -636,7 +636,19 @@ var Matrix = (function(){
         var d = this.props[0]/determinant;
         var e = (this.props[4] * this.props[13] - this.props[5] * this.props[12])/determinant;
         var f = - (this.props[0] * this.props[13] - this.props[1] * this.props[12])/determinant;
-        return [pt[0] * a + pt[1] * c + e, pt[0] * b + pt[1] * d + f, 0];
+        var inverseMatrix = new Matrix();
+        inverseMatrix.props[0] = a;
+        inverseMatrix.props[1] = b;
+        inverseMatrix.props[4] = c;
+        inverseMatrix.props[5] = d;
+        inverseMatrix.props[12] = e;
+        inverseMatrix.props[13] = f;
+        return inverseMatrix;
+    }
+
+    function inversePoint(pt) {
+        var inverseMatrix = this.getInverseMatrix();
+        return inverseMatrix.applyToPointArray(pt[0], pt[1], pt[2] || 0)
     }
 
     function inversePoints(pts){
@@ -753,6 +765,7 @@ var Matrix = (function(){
         this.equals = equals;
         this.inversePoints = inversePoints;
         this.inversePoint = inversePoint;
+        this.getInverseMatrix = getInverseMatrix;
         this._t = this.transform;
         this.isIdentity = isIdentity;
         this._identity = true;
@@ -1782,11 +1795,16 @@ function dataFunctionManager(){
 
     var moduleOb = {};
     moduleOb.completeData = completeData;
+    moduleOb.checkColors = checkColors;
+    moduleOb.checkChars = checkChars;
+    moduleOb.checkShapes = checkShapes;
+    moduleOb.completeLayers = completeLayers;
 
     return moduleOb;
 }
 
 var dataManager = dataFunctionManager();
+
 var FontManager = (function(){
 
     var maxWaitingTime = 5000;
@@ -2455,9 +2473,9 @@ var PropertyFactory = (function(){
         var i, len = data.k.length;
         var s, e,to,ti;
         for (i = 0; i < len - 1; i += 1) {
-            if (data.k[i].to && data.k[i].s && data.k[i].e) {
+            if (data.k[i].to && data.k[i].s && data.k[i + 1] && data.k[i + 1].s) {
                 s = data.k[i].s;
-                e = data.k[i].e;
+                e = data.k[i + 1].s;
                 to = data.k[i].to;
                 ti = data.k[i].ti;
                 if((s.length === 2 && !(s[0] === e[0] && s[1] === e[1]) && bez.pointOnLine2D(s[0],s[1],e[0],e[1],s[0] + to[0],s[1] + to[1]) && bez.pointOnLine2D(s[0],s[1],e[0],e[1],e[0] + ti[0],e[1] + ti[1])) || (s.length === 3 && !(s[0] === e[0] && s[1] === e[1] && s[2] === e[2]) && bez.pointOnLine3D(s[0],s[1],s[2],e[0],e[1],e[2],s[0] + to[0],s[1] + to[1],s[2] + to[2]) && bez.pointOnLine3D(s[0],s[1],s[2],e[0],e[1],e[2],e[0] + ti[0],e[1] + ti[1],e[2] + ti[2]))){
@@ -2525,6 +2543,8 @@ var PropertyFactory = (function(){
     return ob;
 }());
 var TransformPropertyFactory = (function() {
+
+    var defaultVector = [0,0]
 
     function applyToMatrix(mat) {
         var _mdf = this._mdf;
@@ -2613,6 +2633,8 @@ var TransformPropertyFactory = (function() {
                         v2[0] = px.getValueAtTime((px._caching.lastFrame+px.offsetTime - 0.01) / frameRate,px.offsetTime);
                         v2[1] = py.getValueAtTime((py._caching.lastFrame+py.offsetTime - 0.01) / frameRate,py.offsetTime);
                     }
+                } else {
+                    v1 = v2 = defaultVector
                 }
                 this.v.rotate(-Math.atan2(v1[1] - v2[1], v1[0] - v2[0]));
             }
@@ -5485,69 +5507,82 @@ var TextSelectorProp = (function(){
                 this.getValue();
             }
             //var easer = bez.getEasingCurve(this.ne.v/100,0,1-this.xe.v/100,1);
-            var easer = BezierFactory.getBezierEasing(this.ne.v/100,0,1-this.xe.v/100,1).get;
+            var x1 = 0;
+            var y1 = 0;
+            var x2 = 1;
+            var y2 = 1;
+            if(this.ne.v > 0) {
+                x1 = this.ne.v / 100.0;
+            }
+            else {
+                y1 = -this.ne.v / 100.0;
+            }
+            if(this.xe.v > 0) {
+                x2 = 1.0 - this.xe.v / 100.0;
+            }
+            else {
+                y2 = 1.0 + this.xe.v / 100.0;
+            }
+            var easer = BezierFactory.getBezierEasing(x1, y1, x2, y2).get;
+
             var mult = 0;
             var s = this.finalS;
             var e = this.finalE;
             var type = this.data.sh;
-            if(type == 2){
-                if(e === s){
+            if (type === 2){
+                if (e === s) {
                     mult = ind >= e ? 1 : 0;
-                }else{
-                    mult = max(0,min(0.5/(e-s) + (ind-s)/(e-s),1));
+                } else {
+                    mult = max(0, min(0.5 / (e - s) + (ind - s) / (e - s), 1));
                 }
                 mult = easer(mult);
-            }else if(type == 3){
-                if(e === s){
+            } else if(type === 3) {
+                if (e === s) {
                     mult = ind >= e ? 0 : 1;
                 }else{
-                    mult = 1 - max(0,min(0.5/(e-s) + (ind-s)/(e-s),1));
+                    mult = 1 - max(0, min(0.5 / (e - s) + (ind - s) / (e - s),1));
                 }
 
                 mult = easer(mult);
-            }else if(type == 4){
-                if(e === s){
+            } else if (type === 4) {
+                if (e === s) {
                     mult = 0;
-                }else{
-                    mult = max(0,min(0.5/(e-s) + (ind-s)/(e-s),1));
-                    if(mult<0.5){
+                } else {
+                    mult = max(0, min(0.5 / (e - s) + (ind - s) / (e - s), 1));
+                    if (mult < 0.5) {
                         mult *= 2;
-                    }else{
-                        mult = 1 - 2*(mult-0.5);
+                    } else {
+                        mult = 1 - 2 * (mult - 0.5);
                     }
                 }
                 mult = easer(mult);
-            }else if(type == 5){
-                if(e === s){
+            } else if (type === 5) {
+                if (e === s){
                     mult = 0;
-                }else{
+                } else {
                     var tot = e - s;
                     /*ind += 0.5;
                     mult = -4/(tot*tot)*(ind*ind)+(4/tot)*ind;*/
-                    ind = min(max(0,ind+0.5-s),e-s);
+                    ind = min(max(0, ind + 0.5 - s), e - s);
                     var x = -tot/2+ind;
                     var a = tot/2;
-                    mult = Math.sqrt(1 - (x*x)/(a*a));
+                    mult = Math.sqrt(1 - (x * x) / (a * a));
                 }
                 mult = easer(mult);
-            }else if(type == 6){
-                if(e === s){
+            } else if (type === 6) {
+                if (e === s){
                     mult = 0;
-                }else{
-                    ind = min(max(0,ind+0.5-s),e-s);
-                    mult = (1+(Math.cos((Math.PI+Math.PI*2*(ind)/(e-s)))))/2;
-                    /*
-                     ind = Math.min(Math.max(s,ind),e-1);
-                     mult = (1+(Math.cos((Math.PI+Math.PI*2*(ind-s)/(e-1-s)))))/2;
-                     mult = Math.max(mult,(1/(e-1-s))/(e-1-s));*/
+                } else {
+                    ind = min(max(0, ind + 0.5 - s), e - s);
+                    mult = (1 + (Math.cos((Math.PI + Math.PI * 2 * (ind) / (e - s))))) / 2;
                 }
                 mult = easer(mult);
-            }else {
-                if(ind >= floor(s)){
-                    if(ind-s < 0){
-                        mult = 1 - (s - ind);
-                    }else{
-                        mult = max(0,min(e-ind,1));
+            } else {
+                if (ind >= floor(s)) {
+                    if (ind - s < 0) {
+                        mult = max(0, min(min(e, 1) - (s - ind), 1));
+                    } else {
+                        mult = max(0, min(e - ind, 1));
                     }
                 }
                 mult = easer(mult);
@@ -5918,7 +5953,14 @@ function SVGRenderer(animationItem, config){
         viewBoxOnly: (config && config.viewBoxOnly) || false,
         viewBoxSize: (config && config.viewBoxSize) || false,
         className: (config && config.className) || '',
-        focusable: config && config.focusable
+        id: (config && config.id) || '',
+        focusable: config && config.focusable,
+        filterSize: {
+            width: config && config.filterSize && config.filterSize.width || '100%',
+            height: config && config.filterSize && config.filterSize.height || '100%',
+            x: config && config.filterSize && config.filterSize.x || '0%',
+            y: config && config.filterSize && config.filterSize.y || '0%',
+        }
     };
 
     this.globalData = {
@@ -5977,10 +6019,13 @@ SVGRenderer.prototype.configAnimation = function(animData){
         this.svgElement.style.height = '100%';
         this.svgElement.style.transform = 'translate3d(0,0,0)';
     }
-    if(this.renderConfig.className) {
+    if (this.renderConfig.className) {
         this.svgElement.setAttribute('class', this.renderConfig.className);
     }
-    if(this.renderConfig.focusable !== undefined) {
+    if (this.renderConfig.id) {
+        this.svgElement.setAttribute('id', this.renderConfig.id);
+    }
+    if (this.renderConfig.focusable !== undefined) {
         this.svgElement.setAttribute('focusable', this.renderConfig.focusable);
     }
     this.svgElement.setAttribute('preserveAspectRatio',this.renderConfig.preserveAspectRatio);
@@ -6141,7 +6186,8 @@ function CanvasRenderer(animationItem, config){
         progressiveLoad: (config && config.progressiveLoad) || false,
         preserveAspectRatio: (config && config.preserveAspectRatio) || 'xMidYMid meet',
         imagePreserveAspectRatio: (config && config.imagePreserveAspectRatio) || 'xMidYMid slice',
-        className: (config && config.className) || ''
+        className: (config && config.className) || '',
+        id: (config && config.id) || '',
     };
     this.renderConfig.dpr = (config && config.dpr) || 1;
     if (this.animationItem.wrapper) {
@@ -6282,6 +6328,9 @@ CanvasRenderer.prototype.configAnimation = function(animData){
         this.canvasContext = this.animationItem.container.getContext('2d');
         if(this.renderConfig.className) {
             this.animationItem.container.setAttribute('class', this.renderConfig.className);
+        }
+        if(this.renderConfig.id) {
+            this.animationItem.container.setAttribute('id', this.renderConfig.id);
         }
     }else{
         this.canvasContext = this.renderConfig.context;
@@ -6612,8 +6661,7 @@ MaskElement.prototype.renderFrame = function (isFirstFrame) {
         }
         if(this.masksProperties[i].mode !== 'n'){
             if(this.viewData[i].invRect && (this.element.finalTransform.mProp._mdf || isFirstFrame)){
-                this.viewData[i].invRect.setAttribute('x', -finalMat.props[12]);
-                this.viewData[i].invRect.setAttribute('y', -finalMat.props[13]);
+                this.viewData[i].invRect.setAttribute('transform', finalMat.getInverseMatrix().to2dCSS())
             }
             if(this.storedData[i].x && (this.storedData[i].x._mdf || isFirstFrame)){
                 var feMorph = this.storedData[i].expan;
@@ -9099,6 +9147,7 @@ var AnimationItem = function () {
     this.isLoaded = false;
     this.currentFrame = 0;
     this.currentRawFrame = 0;
+    this.firstFrame = 0;
     this.totalFrames = 0;
     this.frameRate = 0;
     this.frameMult = 0;
@@ -9175,6 +9224,8 @@ AnimationItem.prototype.setParams = function(params) {
             this.trigger('data_failed');
         }.bind(this));
     }
+
+    this.initialSegment = params.initialSegment;
 };
 
 AnimationItem.prototype.setData = function (wrapper, animationData) {
@@ -9287,7 +9338,14 @@ AnimationItem.prototype.configAnimation = function (animData) {
     }
     try {
         this.animationData = animData;
-        this.totalFrames = Math.floor(this.animationData.op - this.animationData.ip);
+
+        if (this.initialSegment) {
+            this.totalFrames = Math.floor(this.initialSegment[1] - this.initialSegment[0]);
+            this.firstFrame = Math.round(this.initialSegment[0]);
+        } else {
+            this.totalFrames = Math.floor(this.animationData.op - this.animationData.ip);
+            this.firstFrame = Math.round(this.animationData.ip);
+        }
         this.renderer.configAnimation(animData);
         if(!animData.assets){
             animData.assets = [];
@@ -9295,7 +9353,6 @@ AnimationItem.prototype.configAnimation = function (animData) {
 
         this.assets = this.animationData.assets;
         this.frameRate = this.animationData.fr;
-        this.firstFrame = Math.round(this.animationData.ip);
         this.frameMult = this.animationData.fr / 1000;
         this.renderer.searchExtraCompositions(animData.assets);
         this.trigger('config_ready');
@@ -9691,129 +9748,130 @@ AnimationItem.prototype.triggerConfigError = function(nativeError) {
 }
 function EffectsManager(){}
 
-    var lottiejs = {};
+var lottie = {};
 
-    var _isFrozen = false;
+var _isFrozen = false;
 
-    function setLocationHref (href) {
-        locationHref = href;
+function setLocationHref (href) {
+    locationHref = href;
+}
+
+function searchAnimations() {
+    if (standalone === true) {
+        animationManager.searchAnimations(animationData, standalone, renderer);
+    } else {
+        animationManager.searchAnimations();
     }
+}
 
-    function searchAnimations() {
-        if (standalone === true) {
-            animationManager.searchAnimations(animationData, standalone, renderer);
-        } else {
-            animationManager.searchAnimations();
+function setSubframeRendering(flag) {
+    subframeEnabled = flag;
+}
+
+function loadAnimation(params) {
+    if (standalone === true) {
+        params.animationData = JSON.parse(animationData);
+    }
+    return animationManager.loadAnimation(params);
+}
+
+function setQuality(value) {
+    if (typeof value === 'string') {
+        switch (value) {
+            case 'high':
+                defaultCurveSegments = 200;
+                break;
+            case 'medium':
+                defaultCurveSegments = 50;
+                break;
+            case 'low':
+                defaultCurveSegments = 10;
+                break;
+        }
+    } else if (!isNaN(value) && value > 1) {
+        defaultCurveSegments = value;
+    }
+    if (defaultCurveSegments >= 50) {
+        roundValues(false);
+    } else {
+        roundValues(true);
+    }
+}
+
+function inBrowser() {
+    return typeof navigator !== 'undefined';
+}
+
+function installPlugin(type, plugin) {
+    if (type === 'expressions') {
+        expressionsPlugin = plugin;
+    }
+}
+
+function getFactory(name) {
+    switch (name) {
+        case "propertyFactory":
+            return PropertyFactory;
+        case "shapePropertyFactory":
+            return ShapePropertyFactory;
+        case "matrix":
+            return Matrix;
+    }
+}
+
+lottie.play = animationManager.play;
+lottie.pause = animationManager.pause;
+lottie.setLocationHref = setLocationHref;
+lottie.togglePause = animationManager.togglePause;
+lottie.setSpeed = animationManager.setSpeed;
+lottie.setDirection = animationManager.setDirection;
+lottie.stop = animationManager.stop;
+lottie.searchAnimations = searchAnimations;
+lottie.registerAnimation = animationManager.registerAnimation;
+lottie.loadAnimation = loadAnimation;
+lottie.setSubframeRendering = setSubframeRendering;
+lottie.resize = animationManager.resize;
+//lottie.start = start;
+lottie.goToAndStop = animationManager.goToAndStop;
+lottie.destroy = animationManager.destroy;
+lottie.setQuality = setQuality;
+lottie.inBrowser = inBrowser;
+lottie.installPlugin = installPlugin;
+lottie.freeze = animationManager.freeze;
+lottie.unfreeze = animationManager.unfreeze;
+lottie.getRegisteredAnimations = animationManager.getRegisteredAnimations;
+lottie.__getFactory = getFactory;
+lottie.version = '5.6.6';
+
+function checkReady() {
+    if (document.readyState === "complete") {
+        clearInterval(readyStateCheckInterval);
+        searchAnimations();
+    }
+}
+
+function getQueryVariable(variable) {
+    var vars = queryString.split('&');
+    for (var i = 0; i < vars.length; i++) {
+        var pair = vars[i].split('=');
+        if (decodeURIComponent(pair[0]) == variable) {
+            return decodeURIComponent(pair[1]);
         }
     }
+}
+var standalone = '__[STANDALONE]__';
+var animationData = '__[ANIMATIONDATA]__';
+var renderer = '';
+if (standalone) {
+    var scripts = document.getElementsByTagName('script');
+    var index = scripts.length - 1;
+    var myScript = scripts[index] || {
+        src: ''
+    };
+    var queryString = myScript.src.replace(/^[^\?]+\??/, '');
+    renderer = getQueryVariable('renderer');
+}
+var readyStateCheckInterval = setInterval(checkReady, 100);
 
-    function setSubframeRendering(flag) {
-        subframeEnabled = flag;
-    }
-
-    function loadAnimation(params) {
-        if (standalone === true) {
-            params.animationData = JSON.parse(animationData);
-        }
-        return animationManager.loadAnimation(params);
-    }
-
-    function setQuality(value) {
-        if (typeof value === 'string') {
-            switch (value) {
-                case 'high':
-                    defaultCurveSegments = 200;
-                    break;
-                case 'medium':
-                    defaultCurveSegments = 50;
-                    break;
-                case 'low':
-                    defaultCurveSegments = 10;
-                    break;
-            }
-        } else if (!isNaN(value) && value > 1) {
-            defaultCurveSegments = value;
-        }
-        if (defaultCurveSegments >= 50) {
-            roundValues(false);
-        } else {
-            roundValues(true);
-        }
-    }
-
-    function inBrowser() {
-        return typeof navigator !== 'undefined';
-    }
-
-    function installPlugin(type, plugin) {
-        if (type === 'expressions') {
-            expressionsPlugin = plugin;
-        }
-    }
-
-    function getFactory(name) {
-        switch (name) {
-            case "propertyFactory":
-                return PropertyFactory;
-            case "shapePropertyFactory":
-                return ShapePropertyFactory;
-            case "matrix":
-                return Matrix;
-        }
-    }
-
-    lottiejs.play = animationManager.play;
-    lottiejs.pause = animationManager.pause;
-    lottiejs.setLocationHref = setLocationHref;
-    lottiejs.togglePause = animationManager.togglePause;
-    lottiejs.setSpeed = animationManager.setSpeed;
-    lottiejs.setDirection = animationManager.setDirection;
-    lottiejs.stop = animationManager.stop;
-    lottiejs.searchAnimations = searchAnimations;
-    lottiejs.registerAnimation = animationManager.registerAnimation;
-    lottiejs.loadAnimation = loadAnimation;
-    lottiejs.setSubframeRendering = setSubframeRendering;
-    lottiejs.resize = animationManager.resize;
-    //lottiejs.start = start;
-    lottiejs.goToAndStop = animationManager.goToAndStop;
-    lottiejs.destroy = animationManager.destroy;
-    lottiejs.setQuality = setQuality;
-    lottiejs.inBrowser = inBrowser;
-    lottiejs.installPlugin = installPlugin;
-    lottiejs.freeze = animationManager.freeze;
-    lottiejs.unfreeze = animationManager.unfreeze;
-    lottiejs.getRegisteredAnimations = animationManager.getRegisteredAnimations;
-    lottiejs.__getFactory = getFactory;
-    lottiejs.version = '5.5.9';
-
-    function checkReady() {
-        if (document.readyState === "complete") {
-            clearInterval(readyStateCheckInterval);
-            searchAnimations();
-        }
-    }
-
-    function getQueryVariable(variable) {
-        var vars = queryString.split('&');
-        for (var i = 0; i < vars.length; i++) {
-            var pair = vars[i].split('=');
-            if (decodeURIComponent(pair[0]) == variable) {
-                return decodeURIComponent(pair[1]);
-            }
-        }
-    }
-    var standalone = '__[STANDALONE]__';
-    var animationData = '__[ANIMATIONDATA]__';
-    var renderer = '';
-    if (standalone) {
-        var scripts = document.getElementsByTagName('script');
-        var index = scripts.length - 1;
-        var myScript = scripts[index] || {
-            src: ''
-        };
-        var queryString = myScript.src.replace(/^[^\?]+\??/, '');
-        renderer = getQueryVariable('renderer');
-    }
-    var readyStateCheckInterval = setInterval(checkReady, 100);
-    return lottiejs;
+return lottie;
 }));

@@ -1,6 +1,6 @@
 export type AnimationDirection = 1 | -1;
 export type AnimationSegment = [number, number];
-export type AnimationEventName = 'enterFrame' | 'loopComplete' | 'complete' | 'segmentStart' | 'destroy' | 'config_ready' | 'data_ready' | 'DOMLoaded' | 'error';
+export type AnimationEventName = 'enterFrame' | 'loopComplete' | 'complete' | 'segmentStart' | 'destroy' | 'config_ready' | 'data_ready' | 'DOMLoaded' | 'error' | 'data_failed' | 'loaded_images';
 export type AnimationEventCallback<T = any> = (args: T) => void;
 
 export type AnimationItem = {
@@ -8,7 +8,6 @@ export type AnimationItem = {
     stop(): void;
     pause(): void;
     resize(): void;
-    setLocationHref(href: string): void;
     setSpeed(speed: number): void;
     goToAndPlay(value: number, isFrame?: boolean): void;
     goToAndStop(value: number, isFrame?: boolean): void;
@@ -55,6 +54,7 @@ export type AnimationConfig = {
     loop?: boolean | number;
     autoplay?: boolean;
     name?: string;
+    assetsPath?: string;
     rendererSettings?: SVGRendererConfig | CanvasRendererConfig | HTMLRendererConfig;
 }
 
@@ -76,6 +76,7 @@ type LottiePlayer = {
     destroy(name?: string): void;
     registerAnimation(element: Element, animationData?: any): void;
     setQuality(quality: string | number): void;
+    setLocationHref(href: string): void;
 };
 
 declare const Lottie: LottiePlayer;

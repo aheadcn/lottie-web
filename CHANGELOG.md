@@ -1,3 +1,56 @@
+## V 5.6.6
+- reading file extension correctly when copying original assets
+- fixed inlined json objects with carriage returns
+- added loop support for banners
+- exporting adjustment layers as null layers
+- added checkbox to select comp names as default
+- added filter size configuration and defaulting to 100%
+- Add missing animation event name definitions
+
+## V 5.6.5
+- added initialSegment property
+- fix for zip file without root folder
+- support for including json in banner html template
+- Export 'blur' text animator property
+
+## V 5.6.4
+- added support for using original images as assets
+- Improved log error fix
+- Fixed missing assets during export
+
+## V 5.6.3
+- Fix saving json files with special characters
+- Improved lottie import
+
+## V 5.6.2
+- Fix lottie importer gradient data without keyframes
+- Added hidden layers and hidden properties support for importer
+- Improved error messaging
+- Added assetsPath configuration for typescript
+- fixed mangled lottie declaration
+
+## V 5.6.1
+- Fix on the exporter for older AE versions when a new project didn't have a saved destination yet
+
+## V 5.6.0
+- Support new export mode: Rive
+- Support new export mode: Banner
+- Improved existing export modes
+- Improved image compression solution (now PNGs get well compressed as jpegs)
+- Support for importing Lottie Animations!
+- fixed build to prevent polluting global scope
+- text animator multiplier fix
+- fixes #1883 text offset
+- fixes #1878 supports id attribute for container
+
+## V 5.5.10
+- Improvement: validating if transform is linear to remove spatial interpolation
+- Fix: subtract mask transformed fix
+- Expressions: added posterize time support
+- Fix: incorrect easing function calculation in TextSelectorProperty
+- Fix: auto oriented properties with not keyframes
+- New: Implement a new Canvas renderer that can run on worker threads
+
 ## V 5.5.9
 - Typing: added resize to type definitions
 - Feature: added image sequence support
